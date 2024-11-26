@@ -152,19 +152,13 @@ int main(int argc, char** argv) {
         C[i] = &C_data[i * tamMatriz];
     }
 
-    double start_generation_time = MPI_Wtime();
-
     if (rank == RANK_MASTER) {
         srand(time(NULL));
         generateMatrix(A, tamMatriz, tamMatriz);
         generateMatrix(B, tamMatriz, tamMatriz);
-        printf("Matriz A:\n");
         printMatrix(A, tamMatriz, tamMatriz, 5);
-        printf("Matriz B:\n");
         printMatrix(B, tamMatriz, tamMatriz, 5);
     }
-
-    double end_generation_time = MPI_Wtime();
 
     // Broadcast matrices A and B
     MPI_Bcast(A_data, tamMatriz * tamMatriz, MPI_FLOAT, 0, MPI_COMM_WORLD);
@@ -178,8 +172,6 @@ int main(int argc, char** argv) {
     int start_row = rank * rows_per_process + (rank < extra_rows ? rank : extra_rows);
     int end_row = start_row + rows_per_process + (rank < extra_rows ? 1 : 0);
 
-    double start_multiplication_time = MPI_Wtime();
-
     // Multiplicar
     for (int i = start_row; i < end_row; i++) {
         for (int j = 0; j < tamMatriz; j++) {
@@ -189,8 +181,6 @@ int main(int argc, char** argv) {
             }
         }
     }
-
-    double end_multiplication_time = MPI_Wtime();
 
     // Pillar resultados
     int* recvcounts = (int*)malloc(size * sizeof(int));
@@ -204,16 +194,6 @@ int main(int argc, char** argv) {
         C_data, recvcounts, displs, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
     double end_time = MPI_Wtime();
-
-    if (rank == RANK_MASTER) {
-        // Mostrar porción de la matriz C
-        printf("Matriz C:\n");
-        printMatrix(C, tamMatriz, tamMatriz, 5);
-
-        printf("Tiempo de ejecución global: %f segundos\n", end_time - start_time);
-        printf("Tiempo de generación de matrices: %f segundos\n", end_generation_time - start_generation_time);
-        printf("Tiempo de multiplicación de matrices: %f segundos\n", end_multiplication_time - start_multiplication_time);
-    }
 
     // Liberar memoria
     free(A_data);
