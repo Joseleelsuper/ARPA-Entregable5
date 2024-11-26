@@ -21,79 +21,6 @@ static void generateMatrix(float** matrix, int rows, int cols) {
 }
 
 /*
-    Imprime una línea de la matriz
-
-    @param tamMatrix: tamaño de la matriz
-*/
-static void printLine(int tamMatrix) {
-    printf("+");
-    for (int j = 0; j < tamMatrix + 1; ++j) {
-        printf("-------");
-    }
-    printf("-----+\n");
-}
-
-/*
-    Imprime una matriz
-
-    @param matrix: matriz a imprimir
-    @param rows: número de filas de la matriz
-    @param cols: número de columnas de la matriz
-    @param limit: límite de impresión
-*/
-static void printMatrix(float** matrix, int rows, int cols, int limit = 0) {
-    if (limit == 0) {
-        limit = rows;
-    }
-
-    // Imprimir la línea superior
-    printLine(limit);
-
-    for (int i = 0; i < rows && i < limit; ++i) {
-        // Imprimir los valores de la fila
-        printf("|");
-        for (int j = 0; j < cols && j < limit; ++j) {
-            printf(" %.2f |", matrix[i][j]);
-        }
-        if (cols > limit) {
-            printf(" ... | %.2f |", matrix[i][cols - 1]);
-        }
-        printf("\n");
-
-        // Imprimir las líneas intermedias e inferior de la fila
-        printLine(limit);
-    }
-
-    if (rows > limit) {
-        // Imprimir puntos suspensivos para las filas intermedias
-        printf("|");
-        for (int j = 0; j < limit; ++j) {
-            printf(" ...  |");
-        }
-        if (cols > limit) {
-            printf(" ... | ...  |");
-        }
-        printf("\n");
-
-        // Imprimir la línea intermedia
-        printLine(limit);
-
-        // Imprimir la última fila
-        printf("|");
-        for (int j = 0; j < limit; ++j) {
-            printf(" %.2f |", matrix[rows - 1][j]);
-        }
-        if (cols > limit) {
-            printf(" ... | %.2f |", matrix[rows - 1][cols - 1]);
-        }
-        printf("\n");
-
-        // Imprimir la línea inferior
-        printLine(limit);
-    }
-}
-
-/*
     Función principal
 
     @param argc: número de argumentos
@@ -137,33 +64,6 @@ int main(int argc, char** argv) {
     float** A, ** B, ** C;
     float* A_data, * B_data, * C_data;
 
-    // Reservar memoria para las matrices en posiciones contiguas
-    A = (float**)malloc(tamMatriz * sizeof(float*));
-    B = (float**)malloc(tamMatriz * sizeof(float*));
-    C = (float**)malloc(tamMatriz * sizeof(float*));
-    A_data = (float*)malloc(tamMatriz * tamMatriz * sizeof(float));
-    B_data = (float*)malloc(tamMatriz * tamMatriz * sizeof(float));
-    C_data = (float*)malloc(tamMatriz * tamMatriz * sizeof(float));
-
-    // Asignar memoria para las filas de las matrices
-    for (int i = 0; i < tamMatriz; i++) {
-        A[i] = &A_data[i * tamMatriz];
-        B[i] = &B_data[i * tamMatriz];
-        C[i] = &C_data[i * tamMatriz];
-    }
-
-    if (rank == RANK_MASTER) {
-        srand(time(NULL));
-        generateMatrix(A, tamMatriz, tamMatriz);
-        generateMatrix(B, tamMatriz, tamMatriz);
-        printMatrix(A, tamMatriz, tamMatriz, 5);
-        printMatrix(B, tamMatriz, tamMatriz, 5);
-    }
-
-    // Broadcast matrices A and B
-    MPI_Bcast(A_data, tamMatriz * tamMatriz, MPI_FLOAT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(B_data, tamMatriz * tamMatriz, MPI_FLOAT, 0, MPI_COMM_WORLD);
-
     // Número de filas por proceso
     int rows_per_process = tamMatriz / size;
     // Número de filas adicionales para los primeros procesos
@@ -171,9 +71,101 @@ int main(int argc, char** argv) {
     // Rango de filas para el proceso actual
     int start_row = rank * rows_per_process + (rank < extra_rows ? rank : extra_rows);
     int end_row = start_row + rows_per_process + (rank < extra_rows ? 1 : 0);
+    int local_rows = end_row - start_row;
+
+    // Reservar memoria para las matrices en posiciones contiguas
+    if (rank == RANK_MASTER) {
+        // El maestro necesita espacio para toda la matriz A
+        A = (float**)malloc(tamMatriz * sizeof(float*));
+        C = (float**)malloc(tamMatriz * sizeof(float*));
+        A_data = (float*)malloc(tamMatriz * tamMatriz * sizeof(float));
+        C_data = (float*)malloc(tamMatriz * tamMatriz * sizeof(float));
+        for (int i = 0; i < tamMatriz; i++) {
+            A[i] = &A_data[i * tamMatriz];
+        }
+    }
+    else {
+        // Los demás procesos sólo necesitan espacio para sus filas locales de A
+        A = (float**)malloc(local_rows * sizeof(float*));
+        C = (float**)malloc(local_rows * sizeof(float*));
+        A_data = (float*)malloc(local_rows * tamMatriz * sizeof(float));
+        C_data = (float*)malloc(local_rows * tamMatriz * sizeof(float));
+        for (int i = 0; i < local_rows; i++) {
+            A[i] = &A_data[i * tamMatriz];
+            C[i] = &C_data[i * tamMatriz];
+        }
+    }
+
+    // La matriz B es necesaria completa en todos los procesos
+    B = (float**)malloc(tamMatriz * sizeof(float*));
+    B_data = (float*)malloc(tamMatriz * tamMatriz * sizeof(float));
+    for (int i = 0; i < tamMatriz; i++) {
+        B[i] = &B_data[i * tamMatriz];
+        if (B_data == nullptr) {
+            fprintf(stderr, "Error: No se pudo asignar memoria para B_data.\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        for (int i = 0; i < tamMatriz; i++) {
+            B[i] = &B_data[i * tamMatriz];
+        }
+    }
+
+
+    // Asignar memoria para las filas de las matrices
+    for (int i = 0; i < local_rows; i++) {
+        A[i] = &A_data[i * tamMatriz];
+        C[i] = &C_data[i * tamMatriz];
+    }
+    for (int i = 0; i < tamMatriz; i++) {
+        B[i] = &B_data[i * tamMatriz];
+    }
+
+    // Solo el proceso maestro prepara la matriz completa y los desplazamientos
+    if (rank == RANK_MASTER) {
+        srand(static_cast<unsigned int>(time(NULL)));
+        generateMatrix(A, tamMatriz, tamMatriz);
+        generateMatrix(B, tamMatriz, tamMatriz);
+    }
+
+    // Preparar los recuentos y desplazamientos para Scatterv
+    int* sendcounts_A = nullptr;
+    int* displs_A = nullptr;
+    if (rank == RANK_MASTER) {
+        sendcounts_A = (int*)malloc(size * sizeof(int));
+        displs_A = (int*)malloc(size * sizeof(int));
+        int offset = 0;
+        for (int i = 0; i < size; i++) {
+            int rows = rows_per_process + (i < extra_rows ? 1 : 0);
+            sendcounts_A[i] = rows * tamMatriz;
+            displs_A[i] = offset;
+            offset += sendcounts_A[i];
+        }
+    }
+
+    // Distribuir las filas correspondientes de A a cada proceso
+    MPI_Scatterv(
+        rank == RANK_MASTER ? A_data : nullptr, // Enviar desde A_data en el maestro
+        sendcounts_A,
+        displs_A,
+        MPI_FLOAT,
+        A_data, // Recibir en A_data local
+        local_rows * tamMatriz,
+        MPI_FLOAT,
+        RANK_MASTER,
+        MPI_COMM_WORLD
+    );
+
+    // Broadcast de B, necesaria completa en todos los procesos
+    MPI_Bcast(B_data, tamMatriz * tamMatriz, MPI_FLOAT, RANK_MASTER, MPI_COMM_WORLD);
+
+    // Liberar memoria en el maestro
+    if (rank == RANK_MASTER) {
+        free(sendcounts_A);
+        free(displs_A);
+    }
 
     // Multiplicar
-    for (int i = start_row; i < end_row; i++) {
+    for (int i = 0; i < local_rows; i++) {
         for (int j = 0; j < tamMatriz; j++) {
             C[i][j] = 0.0f;
             for (int k = 0; k < tamMatriz; k++) {
@@ -183,17 +175,33 @@ int main(int argc, char** argv) {
     }
 
     // Pillar resultados
-    int* recvcounts = (int*)malloc(size * sizeof(int));
-    int* displs = (int*)malloc(size * sizeof(int));
+    int* recvcounts = nullptr;
+    int* displs = nullptr;
+    if (rank == RANK_MASTER) {
+        recvcounts = (int*)malloc(size * sizeof(int));
+        displs = (int*)malloc(size * sizeof(int));
+    }
     for (int i = 0; i < size; i++) {
         recvcounts[i] = (tamMatriz / size + (i < extra_rows ? 1 : 0)) * tamMatriz;
         displs[i] = (i * rows_per_process + (i < extra_rows ? i : extra_rows)) * tamMatriz;
     }
 
-    MPI_Gatherv(&C_data[start_row * tamMatriz], (end_row - start_row) * tamMatriz, MPI_FLOAT,
-        C_data, recvcounts, displs, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    MPI_Gatherv(
+        C_data, // Enviar desde C_data local
+        local_rows* tamMatriz,
+        MPI_FLOAT,
+        rank == RANK_MASTER ? C_data : nullptr, // Recibir en C_data en el maestro
+        recvcounts,
+        displs,
+        MPI_FLOAT,
+        RANK_MASTER,
+        MPI_COMM_WORLD
+    );
 
-    double end_time = MPI_Wtime();
+    if (rank == RANK_MASTER) {
+        double end_time = MPI_Wtime();
+        printf("Tiempo de ejecución: %f segundos\n", end_time - start_time);
+    }
 
     // Liberar memoria
     free(A_data);
