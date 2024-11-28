@@ -9,8 +9,8 @@ constexpr int RANK_MASTER = 0;
     Genera valores aleatorios para una matriz.
 
     @param matrix: matriz a la que se le asignar�n los valores aleatorios.
-    @param rows: n�mero de filas de la matriz.
-    @param cols: n�mero de columnas de la matriz.
+    @param rows: numero de filas de la matriz.
+    @param cols: numero de columnas de la matriz.
 */
 static void generateMatrix(float **matrix, int rows, int cols)
 {
@@ -24,26 +24,28 @@ static void generateMatrix(float **matrix, int rows, int cols)
 }
 
 /*
-    Funci�n principal.
+    Funcion principal.
 
-    @param argc: n�mero de argumentos.
-    @param argv: argumentos pasados por l�nea de comandos.
-    @return 0 si la ejecuci�n fue exitosa.
+    @param argc: numero de argumentos.
+    @param argv: argumentos pasados por linea de comandos.
+    @return 0 si la ejecucion fue exitosa.
 */
 int main(int argc, char **argv)
 {
-    // Tama�o de la Matriz
+    // Tamano de la Matriz
     int tamMatriz = 5;
     // Variables para MPI
     int rank, size = 0;
-    // Variables para la divisi�n de las filas
+    // Variables para la division de las filas
     int rows_per_process, extra_rows, start_row, end_row, local_rows = 0;
-    // Variables para la divisi�n de las filas
+    // Variables para la division de las filas
     int *recvcounts, *displs, *sendcounts_A = nullptr, *displs_A = nullptr;
     // Datos de las matrices
     float *A_data, *B_data, *C_data;
     // Matrices
     float **A, **B, **C;
+	// Tiempo de ejecución
+	double start_time, end_time = 0;
 
     MPI_Init(&argc, &argv);
 
@@ -55,10 +57,10 @@ int main(int argc, char **argv)
         if (argc > 1)
         {
             char *end;
-            long val = strtol(argv[1], &end, 10);
+            int val = strtol(argv[1], &end, 10);
             if (*end == '\0' && val > 0)
             {
-                tamMatriz = static_cast<int>(val);
+                tamMatriz = val;
             }
             else
             {
@@ -79,6 +81,8 @@ int main(int argc, char **argv)
             }
         }
     }
+
+	start_time = MPI_Wtime();
 
     MPI_Bcast(&tamMatriz, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -175,6 +179,18 @@ int main(int argc, char **argv)
 
     MPI_Gatherv(C_data, local_rows * tamMatriz, MPI_FLOAT,
                 A_data, recvcounts, displs, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+	end_time = MPI_Wtime();
+
+    if (rank == RANK_MASTER)
+    {
+		printf("-----------------------------------\n");
+		printf("DATOS DE EJECUCCION\n");
+		printf("Numero de procesos: %d\n", size);
+		printf("Tamano de las matrices: %dx%d\n", tamMatriz, tamMatriz);
+		printf("Tiempo de ejecucion: %f segundos\n", end_time - start_time);
+		printf("-----------------------------------\n");
+    }
 
     // Liberar memoria
     free(A_data);
