@@ -32,7 +32,6 @@ static void generateMatrix(float **matrix, int rows, int cols)
 */
 int main(int argc, char **argv)
 {
-
     // Tama�o de la Matriz
     int tamMatriz = 5;
     // Variables para MPI
