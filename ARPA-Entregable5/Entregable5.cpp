@@ -190,6 +190,10 @@ int main(int argc, char **argv)
 		printf("Tamano de las matrices: %dx%d\n", tamMatriz, tamMatriz);
 		printf("Tiempo de ejecucion: %f segundos\n", end_time - start_time);
 		printf("-------------------------------------------\n");
+        printf("\t\tFORMATO CSV:\n\n");
+		printf("procesos, tamano, tiempo\n");
+		printf("%d, %d, %f\n", size, tamMatriz, end_time - start_time);
+		printf("-------------------------------------------\n");
     }
 
     // Liberar memoria
