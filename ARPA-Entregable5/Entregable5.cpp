@@ -32,7 +32,6 @@ static void generateMatrix(float **matrix, int rows, int cols)
 */
 int main(int argc, char **argv)
 {
-
     // Tama�o de la Matriz
     int tamMatriz = 5;
     // Variables para MPI
@@ -45,8 +44,6 @@ int main(int argc, char **argv)
     float *A_data, *B_data, *C_data;
     // Matrices
     float **A, **B, **C;
-    // Variables para medir el tiempo de ejecuci�n
-    double start_time, end_time = 0;
 
     MPI_Init(&argc, &argv);
 
@@ -82,8 +79,6 @@ int main(int argc, char **argv)
             }
         }
     }
-
-	start_time = MPI_Wtime();
 
     MPI_Bcast(&tamMatriz, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -180,13 +175,6 @@ int main(int argc, char **argv)
 
     MPI_Gatherv(C_data, local_rows * tamMatriz, MPI_FLOAT,
                 A_data, recvcounts, displs, MPI_FLOAT, 0, MPI_COMM_WORLD);
-
-	end_time = MPI_Wtime();
-
-	if (rank == RANK_MASTER)
-	{
-		printf("Tiempo de ejecución: %f segundos\n", end_time - start_time);
-	}
 
     // Liberar memoria
     free(A_data);
