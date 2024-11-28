@@ -64,7 +64,7 @@ int main(int argc, char **argv)
             }
             else
             {
-                fprintf(stderr, "Error: El argumento debe ser un n�mero entero positivo.\n");
+                fprintf(stderr, "Error: El argumento debe ser un numero entero positivo.\n");
                 MPI_Abort(MPI_COMM_WORLD, 1);
             }
             // Liberar memoria
@@ -72,12 +72,12 @@ int main(int argc, char **argv)
         }
         else
         {
-            printf("Ingrese el tama�o de las matrices cuadradas: ");
+            printf("Ingrese el tamano de las matrices cuadradas: ");
             while (!(cin >> tamMatriz) || tamMatriz <= 0)
             {
                 cin.clear();
                 cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                printf("Error: Ingrese un n�mero entero positivo: ");
+                printf("Error: Ingrese un numero entero positivo: ");
             }
         }
     }
@@ -184,12 +184,12 @@ int main(int argc, char **argv)
 
     if (rank == RANK_MASTER)
     {
-		printf("-----------------------------------\n");
-		printf("DATOS DE EJECUCCION\n");
+		printf("-------------------------------------------\n");
+		printf("\t\tDATOS DE EJECUCCION\n\n");
 		printf("Numero de procesos: %d\n", size);
 		printf("Tamano de las matrices: %dx%d\n", tamMatriz, tamMatriz);
 		printf("Tiempo de ejecucion: %f segundos\n", end_time - start_time);
-		printf("-----------------------------------\n");
+		printf("-------------------------------------------\n");
     }
 
     // Liberar memoria
