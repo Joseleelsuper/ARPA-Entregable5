@@ -1,51 +1,51 @@
 #include <mpi.h>
-#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
-using namespace std;
-
-constexpr int RANK_MASTER = 0;
+#define RANK_MASTER 0
 
 /*
     Genera valores aleatorios para una matriz.
 
-    @param matrix: matriz a la que se le asignar�n los valores aleatorios.
-    @param rows: numero de filas de la matriz.
-    @param cols: numero de columnas de la matriz.
+    @param matrix: matriz a la que se le asignarán los valores aleatorios.
+    @param rows: número de filas de la matriz.
+    @param cols: número de columnas de la matriz.
 */
-static void generateMatrix(float **matrix, int rows, int cols)
+static void generateMatrix(float** matrix, int rows, int cols)
 {
     for (int i = 0; i < rows; i++)
     {
         for (int j = 0; j < cols; j++)
         {
-            matrix[i][j] = static_cast<float>(rand()) / RAND_MAX;
+            matrix[i][j] = (float)rand() / RAND_MAX;
         }
     }
 }
 
 /*
-    Funcion principal.
+    Función principal.
 
-    @param argc: numero de argumentos.
-    @param argv: argumentos pasados por linea de comandos.
-    @return 0 si la ejecucion fue exitosa.
+    @param argc: número de argumentos.
+    @param argv: argumentos pasados por línea de comandos.
+    @return 0 si la ejecución fue exitosa.
 */
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
-    // Tamano de la Matriz
+    // Tamaño de la Matriz
     int tamMatriz = 5;
     // Variables para MPI
     int rank, size = 0;
-    // Variables para la division de las filas
+    // Variables para la división de las filas
     int rows_per_process, extra_rows, start_row, end_row, local_rows = 0;
-    // Variables para la division de las filas
-    int *recvcounts, *displs, *sendcounts_A = nullptr, *displs_A = nullptr;
+    // Variables para la división de las filas
+    int* recvcounts, * displs, * sendcounts_A = NULL, * displs_A = NULL;
     // Datos de las matrices
-    float *A_data, *B_data, *C_data;
+    float* A_data, * B_data, * C_data;
     // Matrices
-    float **A, **B, **C;
-	// Tiempo de ejecución
-	double start_time, end_time = 0;
+    float** A, ** B, ** C;
+    // Tiempo de ejecución
+    double start_time, end_time = 0;
 
     MPI_Init(&argc, &argv);
 
@@ -56,52 +56,48 @@ int main(int argc, char **argv)
     {
         if (argc > 1)
         {
-            char *end;
-            int val = strtol(argv[1], &end, 10);
-            if (*end == '\0' && val > 0)
+            int val = atoi(argv[1]);
+            if (val > 0)
             {
                 tamMatriz = val;
             }
             else
             {
-                fprintf(stderr, "Error: El argumento debe ser un numero entero positivo.\n");
+                fprintf(stderr, "Error: El argumento debe ser un número entero positivo.\n");
                 MPI_Abort(MPI_COMM_WORLD, 1);
             }
-            // Liberar memoria
-            free(end);
         }
         else
         {
             printf("Ingrese el tamano de las matrices cuadradas: ");
-            while (!(cin >> tamMatriz) || tamMatriz <= 0)
+            if (scanf_s("%d", &tamMatriz) != 1 || tamMatriz <= 0)
             {
-                cin.clear();
-                cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                printf("Error: Ingrese un numero entero positivo: ");
+                fprintf(stderr, "Error: Ingrese un numero entero positivo.\n");
+                MPI_Abort(MPI_COMM_WORLD, 1);
             }
         }
     }
 
-	start_time = MPI_Wtime();
+    start_time = MPI_Wtime();
 
-    MPI_Bcast(&tamMatriz, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&tamMatriz, 1, MPI_INT, RANK_MASTER, MPI_COMM_WORLD);
 
-    // Calcular el n�mero de filas por proceso
+    // Calcular el número de filas por proceso
     rows_per_process = tamMatriz / size;
     extra_rows = tamMatriz % size;
     start_row = rank * rows_per_process + (rank < extra_rows ? rank : extra_rows);
     end_row = start_row + rows_per_process + (rank < extra_rows ? 1 : 0);
     local_rows = end_row - start_row;
 
-    // Reservar memoria solo para las filas necesarias en cada proceso
-    recvcounts = (int *)malloc(size * sizeof(int));
-    displs = (int *)malloc(size * sizeof(int));
-    A_data = (float *)malloc(static_cast<unsigned long long>(tamMatriz) * tamMatriz * sizeof(float));
-    B_data = (float *)malloc(static_cast<unsigned long long>(tamMatriz) * tamMatriz * sizeof(float));
-    C_data = (float *)malloc(static_cast<unsigned long long>(local_rows) * tamMatriz * sizeof(float));
-    A = (float **)malloc(tamMatriz * sizeof(float *));
-    B = (float **)malloc(tamMatriz * sizeof(float *));
-    C = (float **)malloc(local_rows * sizeof(float *));
+    // Reservar memoria para las filas necesarias en cada proceso
+    recvcounts = (int*)malloc(size * sizeof(int));
+    displs = (int*)malloc(size * sizeof(int));
+    A_data = (float*)malloc((unsigned long long)tamMatriz * tamMatriz * sizeof(float));
+    B_data = (float*)malloc((unsigned long long)tamMatriz * tamMatriz * sizeof(float));
+    C_data = (float*)malloc((unsigned long long)local_rows * tamMatriz * sizeof(float));
+    A = (float**)malloc(tamMatriz * sizeof(float*));
+    B = (float**)malloc(tamMatriz * sizeof(float*));
+    C = (float**)malloc(local_rows * sizeof(float*));
 
     // Asignar memoria para las filas de las matrices
     for (int i = 0; i < tamMatriz; i++)
@@ -116,7 +112,7 @@ int main(int argc, char **argv)
 
     if (rank == RANK_MASTER)
     {
-        srand(time(NULL));
+        srand((unsigned int)time(NULL));
         generateMatrix(A, tamMatriz, tamMatriz);
         generateMatrix(B, tamMatriz, tamMatriz);
     }
@@ -124,8 +120,8 @@ int main(int argc, char **argv)
     // Solo el proceso maestro prepara la matriz completa y los desplazamientos
     if (rank == RANK_MASTER)
     {
-        sendcounts_A = (int *)malloc(size * sizeof(int));
-        displs_A = (int *)malloc(size * sizeof(int));
+        sendcounts_A = (int*)malloc(size * sizeof(int));
+        displs_A = (int*)malloc(size * sizeof(int));
         int offset = 0;
         for (int i = 0; i < size; i++)
         {
@@ -138,7 +134,7 @@ int main(int argc, char **argv)
 
     // Distribuir las filas correspondientes de A a cada proceso
     MPI_Scatterv(
-        rank == RANK_MASTER ? A_data : nullptr, // Enviar desde A_data en el maestro
+        rank == RANK_MASTER ? A_data : NULL, // Enviar desde A_data en el maestro
         sendcounts_A,
         displs_A,
         MPI_FLOAT,
@@ -158,15 +154,20 @@ int main(int argc, char **argv)
         free(displs_A);
     }
 
+    // Inicializar matriz C a cero
+    for (int i = 0; i < local_rows * tamMatriz; i++)
+    {
+        C_data[i] = 0.0f;
+    }
+
     // Multiplicar
     for (int i = 0; i < local_rows; i++)
     {
         for (int k = 0; k < tamMatriz; k++)
         {
-            C[i][k] = 0.0f;
             for (int j = 0; j < tamMatriz; j++)
             {
-                C[i][j] += A[i][k] * B[k][j];
+                C[i][j] += A[start_row + i][k] * B[k][j];
             }
         }
     }
@@ -178,22 +179,22 @@ int main(int argc, char **argv)
     }
 
     MPI_Gatherv(C_data, local_rows * tamMatriz, MPI_FLOAT,
-                A_data, recvcounts, displs, MPI_FLOAT, 0, MPI_COMM_WORLD);
+        A_data, recvcounts, displs, MPI_FLOAT, RANK_MASTER, MPI_COMM_WORLD);
 
-	end_time = MPI_Wtime();
+    end_time = MPI_Wtime();
 
     if (rank == RANK_MASTER)
     {
-		printf("-------------------------------------------\n");
-		printf("\t\tDATOS DE EJECUCCION\n\n");
-		printf("Numero de procesos: %d\n", size);
-		printf("Tamano de las matrices: %dx%d\n", tamMatriz, tamMatriz);
-		printf("Tiempo de ejecucion: %f segundos\n", end_time - start_time);
-		printf("-------------------------------------------\n");
+        printf("\n-------------------------------------------\n");
+        printf("\t\tDATOS DE EJECUCION\n\n");
+        printf("Numero de procesos: %d\n", size);
+        printf("Tamano de las matrices: %dx%d\n", tamMatriz, tamMatriz);
+        printf("Tiempo de ejecucion: %f segundos\n", end_time - start_time);
+        printf("-------------------------------------------\n");
         printf("\t\tFORMATO CSV:\n\n");
-		printf("procesos, tamano, tiempo\n");
-		printf("%d, %d, %f\n", size, tamMatriz, end_time - start_time);
-		printf("-------------------------------------------\n");
+        printf("procesos, tamano, tiempo\n");
+        printf("%d, %d, %f\n", size, tamMatriz, end_time - start_time);
+        printf("-------------------------------------------\n");
     }
 
     // Liberar memoria
