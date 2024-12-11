@@ -69,12 +69,8 @@ int main(int argc, char** argv)
         }
         else
         {
-            printf("Ingrese el tamano de las matrices cuadradas: ");
-            if (scanf_s("%d", &tamMatriz) != 1 || tamMatriz <= 0)
-            {
-                fprintf(stderr, "Error: Ingrese un numero entero positivo.\n");
-                MPI_Abort(MPI_COMM_WORLD, 1);
-            }
+            printf("Ingrese el tamaño por línea de comandos.");
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
     }
 
